@@ -17,6 +17,7 @@ import           Ledger                     (datumHash)
 
 
 import           Fracada
+import           FractionToken
 
 import          Plutus.V1.Ledger.Value
 import           Plutus.V1.Ledger.Api
@@ -31,75 +32,56 @@ import           Data.Aeson
 -- nft = AssetClass (nftCurrencySymbol, nftTokenName)
 -- fractionToken = Plutus.TokenName fractionTokenName
 
+contractInfo = ContractInfo
+    { owner = ("75e003e0749ce453fc419933297de37f4e859324dc79d1156b3699f9")
+    }
+
 main :: IO ()
 main = do
   args <- getArgs
   let nargs = length args
-  if nargs /= 4 then
+  if nargs /= 0 then
     do
       putStrLn $ "Usage:"
-      putStrLn $ "script-dump <NFT currency symbol> <NFT token name> <Fraction token name> <number of fractions>"
+      putStrLn $ "script-dump"
   else 
     do 
       let       
-        [nftSymbol, nftTokenName', fractionTokenName', numberOfFractions'] = args
         validatorname = "validator.plutus"
         mintingname = "minting.plutus"
-        scriptnum = 42
-        nftCurrencySymbol = fromString nftSymbol
-        nftTokenName = fromString nftTokenName' 
-        fractionTokenName = fromString fractionTokenName'
-        numberOfFractions = read numberOfFractions'
-        
-        nft = AssetClass (nftCurrencySymbol, nftTokenName)
-        
-        fractionToken = Plutus.TokenName fractionTokenName
-        fractionTokenCurrId = curSymbol nft numberOfFractions fractionToken
-        fractionTokenClass = AssetClass (fractionTokenCurrId, fractionToken)
 
-        appliedValidatorScript =fractionValidatorScript nft
-
-        validatorAsCbor = serialise appliedValidatorScript
+        validatorAsCbor = serialise fractionValidatorScript
         validatorShortBs = SBS.toShort . LB.toStrict $ validatorAsCbor
         validatorScript = PlutusScriptSerialised validatorShortBs
-        appliedMintingPolicy = mintFractionTokensPolicy nft numberOfFractions fractionToken
+
+        appliedMintingPolicy = mintFractionTokensPolicy contractInfo fractionNftValidatorHash
 
         mintingAsValidator = Plutus.Validator $ Plutus.unMintingPolicyScript appliedMintingPolicy
         mintingAsCbor = serialise mintingAsValidator
         mintingScriptShortBs = SBS.toShort . LB.toStrict $ mintingAsCbor
         mintingScript = PlutusScriptSerialised mintingScriptShortBs
 
-        
-        datum =FractionNFTDatum{ tokensClass= fractionTokenClass, totalFractions = numberOfFractions}
-        dHash = datumHash $ Datum $ toBuiltinData datum
-        datumToEncode = Plutus.builtinDataToData $ toBuiltinData datum
-        encoded = Data.Aeson.encode (scriptDataToJson ScriptDataJsonDetailedSchema $ fromPlutusData datumToEncode) 
-
       putStrLn $ "Writing output to: " ++ validatorname
-      writePlutusScript scriptnum validatorname validatorScript validatorShortBs
+      writePlutusScript validatorname validatorScript validatorShortBs
 
-      writeFile "validator-hash.txt" (show $ fractionNftValidatorHash nft)
+      writeFile "validator-hash.txt" (show $ fractionNftValidatorHash)
 
       putStrLn $ "Writing output to: " ++ mintingname
-      writePlutusScript scriptnum mintingname mintingScript mintingScriptShortBs      
+      writePlutusScript mintingname mintingScript mintingScriptShortBs      
 
-      writeFile "currency-id.txt" (show $ curSymbol nft numberOfFractions fractionToken)        
+      writeFile "currency-id.txt" (show $ curSymbol contractInfo fractionNftValidatorHash)        
 
-      LB.writeFile "datum.json" encoded
-      writeFile "datum-hash.txt" $ show dHash
-
-
-writePlutusScript :: Integer -> FilePath -> PlutusScript PlutusScriptV1 -> SBS.ShortByteString -> IO ()
-writePlutusScript scriptnum filename scriptSerial scriptSBS =
+writePlutusScript :: FilePath -> PlutusScript PlutusScriptV1 -> SBS.ShortByteString -> IO ()
+writePlutusScript filename scriptSerial scriptSBS =
   do
   case Plutus.defaultCostModelParams of
-        Just m ->
-          let Alonzo.Data pData = toAlonzoData (ScriptDataNumber scriptnum)
-              (logout, e) = Plutus.evaluateScriptCounting Plutus.Verbose m scriptSBS [pData]
+        Just m -> print "Working."
+          {-- let Alonzo.Data pData = toAlonzoData (ScriptDataNumber scriptnum)
+              -- (logout, e) = Plutus.evaluateScriptCounting Plutus.Verbose m scriptSBS [pData]
           in do print ("Log output" :: String) >> print logout
                 case e of
                   Left evalErr -> print ("Eval Error" :: String) >> print evalErr
-                  Right exbudget -> print ("Ex Budget" :: String) >> print exbudget
+                  Right exbudget -> print ("Ex Budget" :: String) >> print exbudget --}
         Nothing -> error "defaultCostModelParams failed"
   result <- writeFileTextEnvelope filename Nothing scriptSerial
   case result of

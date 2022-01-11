@@ -11,7 +11,7 @@ License-files:       LICENSE
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Fracada
+  exposed-modules:     Fracada, FractionToken
   build-depends:       aeson
                      , base ^>=4.14.1.0
                      , bytestring
@@ -98,7 +98,7 @@ executable           Emulator
 executable           script-dump
   main-is:           script-dump.hs
   hs-source-dirs:    exe, src
-  other-modules:     Fracada
+  other-modules:     Fracada, FractionToken
   build-depends:     base
                     , aeson
                     , cardano-api
